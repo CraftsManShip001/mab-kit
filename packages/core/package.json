@@ -1,0 +1,25 @@
+{
+  "name": "@mab-kit/core",
+  "version": "0.1.0",
+  "description": "Framework-agnostic Multi-Armed Bandit core: Beta-Bernoulli Thompson Sampling with zero dependencies",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["multi-armed-bandit", "thompson-sampling", "ab-testing", "bandit", "experimentation"],
+  "license": "MIT"
+}

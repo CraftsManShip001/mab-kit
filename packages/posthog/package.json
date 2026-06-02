@@ -1,0 +1,28 @@
+{
+  "name": "@mab-kit/posthog",
+  "version": "0.1.0",
+  "description": "PostHog adapter for mab-kit: read exposure/conversion stats via HogQL and drive multivariate feature-flag rollout with Thompson Sampling",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mab-kit/core": "workspace:*"
+  },
+  "keywords": ["posthog", "feature-flags", "multi-armed-bandit", "thompson-sampling", "ab-testing"],
+  "license": "MIT"
+}
