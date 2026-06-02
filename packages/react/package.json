@@ -34,5 +34,12 @@
     "react-dom": "^19.0.0"
   },
   "keywords": ["react", "posthog", "feature-flags", "multi-armed-bandit", "ab-testing"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CraftsManShip001/mab-kit.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/CraftsManShip001/mab-kit#readme",
+  "bugs": "https://github.com/CraftsManShip001/mab-kit/issues"
 }

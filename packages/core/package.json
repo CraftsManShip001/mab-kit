@@ -21,5 +21,12 @@
     "typecheck": "tsc --noEmit"
   },
   "keywords": ["multi-armed-bandit", "thompson-sampling", "ab-testing", "bandit", "experimentation"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CraftsManShip001/mab-kit.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/CraftsManShip001/mab-kit#readme",
+  "bugs": "https://github.com/CraftsManShip001/mab-kit/issues"
 }

@@ -24,5 +24,12 @@
     "@mab-kit/core": "workspace:*"
   },
   "keywords": ["posthog", "feature-flags", "multi-armed-bandit", "thompson-sampling", "ab-testing"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CraftsManShip001/mab-kit.git",
+    "directory": "packages/posthog"
+  },
+  "homepage": "https://github.com/CraftsManShip001/mab-kit#readme",
+  "bugs": "https://github.com/CraftsManShip001/mab-kit/issues"
 }

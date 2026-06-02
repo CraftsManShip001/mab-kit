@@ -20,6 +20,12 @@
   },
   "packageManager": "pnpm@10.18.1",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CraftsManShip001/mab-kit.git"
+  },
+  "homepage": "https://github.com/CraftsManShip001/mab-kit#readme",
+  "bugs": "https://github.com/CraftsManShip001/mab-kit/issues",
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild"]
   }
