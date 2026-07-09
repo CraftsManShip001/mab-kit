@@ -1,17 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 
 /**
- * Fake PostHog client. `flagValue` controls what getFeatureFlag returns;
- * onFeatureFlags fires its callback immediately (flags "already loaded").
+ * Fake PostHog client. `flagValue` controls what getFeatureFlag returns.
+ * With `deferFlags = true`, flags behave as not-yet-loaded: getFeatureFlag
+ * returns undefined and the onFeatureFlags callback is held until
+ * `loadFlags()` is called (mirrors real posthog-js behavior).
  */
 const captureSpy = vi.fn();
 let flagValue: string | boolean | undefined = "test";
+let deferFlags = false;
+let heldFlagCallbacks: Array<() => void> = [];
+
+const getFeatureFlagSpy = vi.fn(() => (deferFlags ? undefined : flagValue));
+
+function loadFlags() {
+  deferFlags = false;
+  const cbs = heldFlagCallbacks;
+  heldFlagCallbacks = [];
+  cbs.forEach((cb) => cb());
+}
 
 const fakePostHog = {
-  getFeatureFlag: () => flagValue,
+  getFeatureFlag: getFeatureFlagSpy,
   onFeatureFlags: (cb: () => void) => {
-    cb();
+    if (deferFlags) {
+      heldFlagCallbacks.push(cb);
+    } else {
+      cb();
+    }
     return () => {};
   },
   capture: captureSpy,
@@ -27,32 +44,50 @@ import { useVariant, useVariantValue, Experiment, Variant } from "../src/index.j
 
 beforeEach(() => {
   captureSpy.mockClear();
+  getFeatureFlagSpy.mockClear();
   flagValue = "test";
+  deferFlags = false;
+  heldFlagCallbacks = [];
   window.localStorage.clear();
 });
 
-describe("useVariant", () => {
-  function Probe() {
-    const { variant, isLoading, track } = useVariant("homepage-hero");
-    return (
-      <div>
-        <span data-testid="variant">{variant}</span>
-        <span data-testid="loading">{String(isLoading)}</span>
-        <button onClick={() => track("signup_completed", { plan: "pro" })}>go</button>
-      </div>
-    );
-  }
+function Probe() {
+  const { variant, isLoading, track } = useVariant("homepage-hero");
+  return (
+    <div>
+      <span data-testid="variant">{variant}</span>
+      <span data-testid="loading">{String(isLoading)}</span>
+      <button onClick={() => track("signup_completed", { plan: "pro" })}>go</button>
+    </div>
+  );
+}
 
+describe("useVariant", () => {
   it("resolves the assigned variant and stops loading", () => {
     render(<Probe />);
     expect(screen.getByTestId("variant").textContent).toBe("test");
     expect(screen.getByTestId("loading").textContent).toBe("false");
   });
 
-  it("track() forwards the event and properties to posthog.capture", () => {
+  it("keeps isLoading=true until flags actually load (M1 regression)", () => {
+    deferFlags = true;
+    render(<Probe />);
+    // Flags not loaded yet: must still be loading, not flashing fallback.
+    expect(screen.getByTestId("loading").textContent).toBe("true");
+    expect(screen.getByTestId("variant").textContent).toBe("");
+
+    act(() => loadFlags());
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+    expect(screen.getByTestId("variant").textContent).toBe("test");
+  });
+
+  it("track() stamps the displayed variant onto the event (C1a regression)", () => {
     render(<Probe />);
     fireEvent.click(screen.getByText("go"));
-    expect(captureSpy).toHaveBeenCalledWith("signup_completed", { plan: "pro" });
+    expect(captureSpy).toHaveBeenCalledWith("signup_completed", {
+      "$feature/homepage-hero": "test",
+      plan: "pro",
+    });
   });
 
   it("stickyLock pins the first variant even after the flag changes", () => {
@@ -66,11 +101,43 @@ describe("useVariant", () => {
     render(<StickyProbe />);
     expect(screen.getByTestId("variant").textContent).toBe("control");
   });
+
+  it("stickyLock still evaluates the flag so exposure fires (C1b regression)", () => {
+    flagValue = "control";
+    const { unmount } = render(<StickyProbe />);
+    unmount();
+
+    getFeatureFlagSpy.mockClear();
+    flagValue = "test"; // PostHog re-bucketed this user
+    render(<StickyProbe />);
+    // Displays the locked variant but MUST still call getFeatureFlag —
+    // that call is what emits $feature_flag_called (the trial count).
+    expect(screen.getByTestId("variant").textContent).toBe("control");
+    expect(getFeatureFlagSpy).toHaveBeenCalled();
+  });
+
+  it("stickyLock track() attributes conversions to the SEEN variant, not PostHog's (C1a regression)", () => {
+    flagValue = "control";
+    const { unmount } = render(<StickyProbe />);
+    unmount();
+
+    flagValue = "test"; // PostHog now assigns "test", user still sees locked "control"
+    render(<StickyProbe />);
+    fireEvent.click(screen.getByText("convert"));
+    expect(captureSpy).toHaveBeenCalledWith("signup_completed", {
+      "$feature/homepage-hero": "control",
+    });
+  });
 });
 
 function StickyProbe() {
-  const { variant } = useVariant("homepage-hero", { stickyLock: true });
-  return <span data-testid="variant">{variant}</span>;
+  const { variant, track } = useVariant("homepage-hero", { stickyLock: true });
+  return (
+    <div>
+      <span data-testid="variant">{variant}</span>
+      <button onClick={() => track("signup_completed")}>convert</button>
+    </div>
+  );
 }
 
 describe("useVariantValue", () => {
@@ -125,6 +192,22 @@ describe("<Experiment> / <Variant>", () => {
     render(<App />);
     expect(screen.queryByText("Hero A")).not.toBeNull();
     expect(screen.queryByText("Hero B")).toBeNull();
+  });
+
+  it("shows the loading node until flags load", () => {
+    deferFlags = true;
+    render(
+      <Experiment flag="homepage-hero" loading={<p>Loading…</p>}>
+        <Variant name="test">
+          <p>Hero B</p>
+        </Variant>
+      </Experiment>,
+    );
+    expect(screen.queryByText("Loading…")).not.toBeNull();
+    expect(screen.queryByText("Hero B")).toBeNull();
+
+    act(() => loadFlags());
+    expect(screen.queryByText("Hero B")).not.toBeNull();
   });
 
   it("throws if <Variant> is used outside <Experiment>", () => {

@@ -1,6 +1,6 @@
 # @mab-kit/posthog
 
-PostHog adapter for [mab-kit](https://github.com/). Reads per-variant
+PostHog adapter for [mab-kit](https://github.com/CraftsManShip001/mab-kit). Reads per-variant
 exposure/conversion stats via HogQL and drives a multivariate feature flag's
 rollout percentages with Thompson Sampling. **No database to operate** —
 PostHog is the stats + delivery layer.

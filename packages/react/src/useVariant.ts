@@ -20,9 +20,10 @@ export interface UseVariantResult {
   /** True until PostHog has resolved feature flags at least once. */
   isLoading: boolean;
   /**
-   * Report a conversion for this experiment. PostHog automatically stamps the
-   * active variant onto the event via its `$feature/<flagKey>` property, so the
-   * recompute job can attribute it. Pass the conversion event name.
+   * Report a conversion for this experiment. The event is stamped with the
+   * variant the user actually saw (`$feature/<flagKey>`), which takes
+   * precedence over posthog-js's auto-stamp — required for correct attribution
+   * when `stickyLock` displays a variant PostHog has since re-bucketed.
    */
   track: (eventName: string, properties?: Record<string, unknown>) => void;
 }
@@ -62,36 +63,42 @@ export function useVariant(
   const { stickyLock = false, fallback } = options;
   const posthog = usePostHog();
 
-  const [variant, setVariant] = useState<string | undefined>(() =>
-    stickyLock ? readLocked(flagKey) : undefined,
-  );
+  // Deliberately NOT initialized from localStorage: the server renders
+  // `undefined`, so reading the lock during the first client render would
+  // cause a hydration mismatch. The effect below restores the lock post-mount.
+  const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!posthog) return;
 
-    const resolve = () => {
-      // If locked to a previous variant, keep it.
+    const resolve = (flagsLoaded: boolean) => {
+      // Always evaluate the flag — this is what makes PostHog record the
+      // exposure ($feature_flag_called). A sticky lock may decide what we
+      // DISPLAY, but it must never suppress the exposure event, or locked
+      // users would convert without ever counting as trials.
+      const value = posthog.getFeatureFlag(flagKey);
+      const assigned = typeof value === "string" ? value : undefined;
+
+      let next = assigned;
       if (stickyLock) {
         const locked = readLocked(flagKey);
         if (locked) {
-          setVariant(locked);
-          setIsLoading(false);
-          return;
+          next = locked;
+        } else if (assigned !== undefined) {
+          writeLocked(flagKey, assigned);
         }
       }
-      const value = posthog.getFeatureFlag(flagKey);
-      const next = typeof value === "string" ? value : undefined;
-      if (next !== undefined) {
-        if (stickyLock) writeLocked(flagKey, next);
-        setVariant(next);
-      }
-      setIsLoading(false);
+
+      if (next !== undefined) setVariant(next);
+      // Flags are "loaded" only when onFeatureFlags fired or the flag already
+      // resolved to a value. A bare undefined before load must keep isLoading
+      // true, otherwise consumers flash fallback content for the whole fetch.
+      if (flagsLoaded || value !== undefined) setIsLoading(false);
     };
 
-    // Resolve immediately if flags are already loaded, and subscribe for updates.
-    resolve();
-    const unsubscribe = posthog.onFeatureFlags(() => resolve());
+    resolve(false);
+    const unsubscribe = posthog.onFeatureFlags(() => resolve(true));
     return () => {
       if (typeof unsubscribe === "function") unsubscribe();
     };
@@ -99,9 +106,18 @@ export function useVariant(
 
   const track = useCallback(
     (eventName: string, properties?: Record<string, unknown>) => {
-      posthog?.capture(eventName, properties);
+      if (!posthog) return;
+      // Stamp the DISPLAYED variant. posthog-js auto-attaches $feature/<flag>
+      // from its own current assignment, which can differ from a sticky-locked
+      // variant after rollout changes; explicit properties win the merge.
+      posthog.capture(
+        eventName,
+        variant !== undefined
+          ? { [`$feature/${flagKey}`]: variant, ...properties }
+          : properties,
+      );
     },
-    [posthog],
+    [posthog, flagKey, variant],
   );
 
   return { variant: variant ?? fallback, isLoading, track };

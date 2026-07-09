@@ -1,6 +1,6 @@
 # @mab-kit/react
 
-React hook for [mab-kit](https://github.com/). Reads a PostHog-driven bandit
+React hook for [mab-kit](https://github.com/CraftsManShip001/mab-kit). Reads a PostHog-driven bandit
 variant and reports conversions.
 
 ```bash

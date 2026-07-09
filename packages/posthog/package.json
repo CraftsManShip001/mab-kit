@@ -1,6 +1,6 @@
 {
   "name": "@mab-kit/posthog",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "PostHog adapter for mab-kit: read exposure/conversion stats via HogQL and drive multivariate feature-flag rollout with Thompson Sampling",
   "type": "module",
   "main": "./dist/index.cjs",

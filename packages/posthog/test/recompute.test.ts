@@ -126,6 +126,37 @@ describe("recompute (PostHog pipeline)", () => {
     expect(test.newPercentage).toBeLessThanOrEqual(61);
   });
 
+  it("isolates a failing experiment so the rest still run (M5 regression)", async () => {
+    const state: MockState = {
+      variants: [
+        { key: "control", rollout_percentage: 50 },
+        { key: "test", rollout_percentage: 50 },
+      ],
+      trials: { control: 1000, test: 1000 },
+      conversions: { control: 100, test: 300 },
+    };
+
+    const reports = await recompute({
+      ...baseConn,
+      fetchImpl: makeFetch(state),
+      rng: mulberry32(7),
+      experiments: [
+        // First experiment references a flag the mock does not have.
+        { flagKey: "deleted-flag", conversionEvent: "signup_completed" },
+        { flagKey: "homepage-hero", conversionEvent: "signup_completed" },
+      ],
+    });
+
+    expect(reports).toHaveLength(2);
+    expect(reports[0]!.flagKey).toBe("deleted-flag");
+    expect(reports[0]!.error).toMatch(/not found/i);
+    expect(reports[0]!.updated).toBe(false);
+    // The second experiment still ran and produced a real report.
+    expect(reports[1]!.flagKey).toBe("homepage-hero");
+    expect(reports[1]!.error).toBeUndefined();
+    expect(reports[1]!.variants).toHaveLength(2);
+  });
+
   it("does not PATCH when dryRun is set", async () => {
     const state: MockState = {
       variants: [

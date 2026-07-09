@@ -1,6 +1,6 @@
 {
   "name": "@mab-kit/react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React hooks for mab-kit: read PostHog-driven bandit variants and report conversions",
   "type": "module",
   "main": "./dist/index.cjs",

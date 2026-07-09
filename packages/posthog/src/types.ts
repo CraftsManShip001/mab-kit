@@ -81,4 +81,9 @@ export interface ExperimentReport {
   flagKey: string;
   updated: boolean;
   variants: VariantReport[];
+  /**
+   * Present when this experiment's recompute failed. Failures are isolated:
+   * the other experiments in the same run still execute.
+   */
+  error?: string;
 }

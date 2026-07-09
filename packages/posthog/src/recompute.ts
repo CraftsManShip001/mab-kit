@@ -124,7 +124,18 @@ export async function recompute(config: RecomputeConfig): Promise<ExperimentRepo
 
   const reports: ExperimentReport[] = [];
   for (const experiment of config.experiments) {
-    reports.push(await recomputeExperiment(client, experiment, opts));
+    try {
+      reports.push(await recomputeExperiment(client, experiment, opts));
+    } catch (err) {
+      // Isolate failures: one deleted/broken flag must not freeze the rollout
+      // updates of every experiment configured after it.
+      reports.push({
+        flagKey: experiment.flagKey,
+        updated: false,
+        variants: [],
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
   return reports;
 }
